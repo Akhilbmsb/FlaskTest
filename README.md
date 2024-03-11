@@ -3,16 +3,28 @@
 # dockerfile
 
 ```
-FROM python:3.8
+FROM python:3.8 AS builder
 
 
 WORKDIR /app
 
 
-COPY . /app
+COPY requirements.txt .
 
 
 RUN pip install --no-cache-dir -r requirements.txt
+
+
+FROM python:3.8-slim
+
+
+WORKDIR /app
+
+
+COPY --from=builder /usr/local/lib/python3.8/site-packages/ /usr/local/lib/python3.8/site-packages/
+
+
+COPY . .
 
 
 EXPOSE 5000
@@ -23,6 +35,39 @@ ENV FLASK_APP=app.py
 
 CMD ["flask", "test"]
 
+```
+
+```
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout main
+            }
+        }
+
+
+        stage('Run tests') {
+            steps {
+                sh './venv/bin/activate && python3 -m pytest'
+            }
+        }
+
+        stage('Build Docker image') {
+            steps {
+                script {
+                    if (currentBuild.result == 'SUCCESS') {
+                        sh 'docker build -t flask-test .'
+                    } else {
+                        echo 'Build failed'
+                    }
+                }
+            }
+        }
+    }
+}
 
 ```
 
